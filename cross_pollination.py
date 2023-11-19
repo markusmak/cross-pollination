@@ -13,6 +13,8 @@ from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from getpass import getpass
+import gradio as gr
+
 
 path1 = "arxiv_12_28_2022.json"
 path2 = "since_dec22.json"
@@ -99,28 +101,7 @@ def collect_results(hits,sents, path, prefix=""):
 
 
 
-##### Start code
-model = SentenceTransformer('sentence-transformers/allenai-specter', device='cpu')
-OPENAI_API_KEY = "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" ##getpass("Please enter your OPEN AI API KEY to continue:")
-## load the OPENAI LLM model
-open_ai_key = OPENAI_API_KEY
-
-sents_from_path1 = preprocess(path1)
-sents_from_path2 = preprocess(path2)
-
-## indices from Annoy
-an = generate_annoy("annoy_index.ann")
-an2 = generate_annoy("annoy_index_since_dec22.ann")
-
-
-llm = OpenAI(openai_api_key=open_ai_key, model_name= "gpt-3.5-turbo-16k")
-
-while True:
-    print ("===============================")
-
-    query = input("Describe the field (or subfield) as a query:")
-    print ("===============================")
-
+def get_research_gaps(query):
     print (query)
     response1 = collect_results(search(query,an,model,30),sents_from_path1, path1)
     response2 = collect_results(search(query,an2,model,10),sents_from_path2, path2)
@@ -173,15 +154,13 @@ while True:
         orthogonal_field = input("Orthogonal Field:")
     except Exception as e:
         print (e)
-        continue
 
     llm_response = json.loads(output)
-    
- 
+    return llm_response
 
-
-
-    response1 = collect_results(search(orthogonal_field,an,model,30),sents_from_path1, path1)
+def get_ideas(orthogonal_field, llm_response, query):
+    # response1 = collect_results(search(orthogonal_field,an,model,30),sents_from_path1, path1)
+    response1=""
     response2 = collect_results(search(orthogonal_field,an2,model,10),sents_from_path2, path2)
     response = response1 + "\n" + response2
     if (len(response) > 60000):
@@ -235,6 +214,40 @@ while True:
         print (output)
     except Exception as e:
         print (e)
-        continue
+    
+
+with gr.Blocks() as demo:
+    gr.Markdown("<h1><center>Research Gap and Idea Brainstorm</center></h1>")
+    gr.Markdown("<h2>Generate Research Gaps</h2>")
+    field = gr.Textbox(label="Field")
+    field_submit_btn = gr.Button("Submit")
+    research_gap = gr.Textbox(label="Research Gap")
+    field_submit_btn.click(get_research_gaps,[field], [research_gap])
+
+    gr.Markdown("<h2>Generate Ideas</h2>")
+    orthogonal_field = gr.Textbox(label="Orthogonal Field")
+    idea_submit_btn = gr.Button("Submit")
+    ideas = gr.Textbox(label="Ideas")
+    idea_submit_btn.click(get_research_gaps,[orthogonal_field, research_gap, field], [ideas])
+
+
+if __name__ == "__main__":
+    ##### Start code
+    model = SentenceTransformer('sentence-transformers/allenai-specter', device='cpu')
+    OPENAI_API_KEY = "" ##getpass("Please enter your OPEN AI API KEY to continue:")
+    ## load the OPENAI LLM model
+    open_ai_key = OPENAI_API_KEY
+
+    sents_from_path1 = preprocess(path1)
+    sents_from_path2 = preprocess(path2)
+
+    ## indices from Annoy
+    an = generate_annoy("annoy_index.ann")
+    an2 = generate_annoy("annoy_index_since_dec22.ann")
+
+    llm = OpenAI(openai_api_key=open_ai_key, model_name= "gpt-3.5-turbo-16k")
+    demo.launch(show_api=False)
+
+
 
 
